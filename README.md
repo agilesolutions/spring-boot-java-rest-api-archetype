@@ -34,7 +34,27 @@ Generates basic SpringBoot REST API application with the following features:
 * Monitoring with Prometheus, Grafana
 * ELK based logging
 
-## Developer Notes
+## Springboot developer notes
+
+
+## Jenkins CI/CD integration
+* [read devops tools 2.4](https://github.com/vfarcic/vfarcic.github.io/blob/master/devops24/jenkins-cdp-demo.md)
+* kubeaps search stable/jenkins
+* download https://github.com/helm/charts/tree/master/stable/jenkins
+* helm install stable/jenkins -name jenkins --namespace jenkins
+* kubectl -n jenkins rollout status deploy jenkins
+* helm inspect stable/jenkins
+* helm ls
+* helm status jenkins
+* kubectl -n kube-system get cm
+* kubectl -n kube-system describe cm jenkins.v1
+" kubectl -n jenkins get all
+* kubectl -n jenkins describe deploymetn jenkins
+* helm delete jenkins --purge
+* helm inspect values stable/jenkins
+* customize the jenkins helm setups with the values from the jenkins folder
+* Install the jenkins pipelins shared libraries from Jenkins-shared-libraries directory
+
 
 Procedure for deploying to Maven Central https://central.sonatype.org/pages/apache-maven.html
 
