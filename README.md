@@ -34,7 +34,9 @@ Generates basic SpringBoot REST API application with the following features:
 * Monitoring with Prometheus, Grafana
 * ELK based logging
 
-## Springboot developer notes
+## Jenkind CDP Continuous Deployment pipelines
+
+* [Setting up continuous deployment pipelines](./docu/jenkins-cdp.md)
 
 
 ## Jenkins CI/CD integration

@@ -1,41 +1,68 @@
-podTemplate(label: 'mypod', containers: [
-    containerTemplate(name: 'docker', image: 'docker', ttyEnabled: true, command: 'cat'),
-    containerTemplate(name: 'kubectl', image: 'lachlanevenson/k8s-kubectl:v1.8.0', command: 'cat', ttyEnabled: true),
-  ],
-  volumes: [
-    hostPathVolume(mountPath: '/var/run/docker.sock', hostPath: '/var/run/docker.sock'),
-  ]) {
-    node('mypod') {
+import java.text.SimpleDateFormat
 
-        stage('do some Docker work') {
-            container('docker') {
+currentBuild.displayName = new SimpleDateFormat("yy.MM.dd").format(new Date()) + "-" + env.BUILD_NUMBER
+env.PROJECT = "go-demo-3"
+env.REPO = "https://github.com/vfarcic/go-demo-3.git" // Change me!
+env.IMAGE = "vfarcic/go-demo-3" // Change me!
+env.DOMAIN = "acme.com" // Change me!
+env.ADDRESS = "go-demo-3.acme.com" // Change me!
+env.CM_ADDR = "cm.acme.com" // Change me!
+env.CHART_VER = "0.0.1"
+def label = "jenkins-slave-${UUID.randomUUID().toString()}"
 
-                withCredentials([[$class: 'UsernamePasswordMultiBinding', 
-                        credentialsId: 'dockerhub',
-                        usernameVariable: 'DOCKER_HUB_USER', 
-                        passwordVariable: 'DOCKER_HUB_PASSWORD']]) {
-                    
-                    sh """
-                        docker pull ubuntu
-                        docker tag ubuntu ${env.DOCKER_HUB_USER}/ubuntu:${env.BUILD_NUMBER}
-                        """
-                    sh "docker login -u ${env.DOCKER_HUB_USER} -p ${env.DOCKER_HUB_PASSWORD} "
-                    sh "docker push ${env.DOCKER_HUB_USER}/ubuntu:${env.BUILD_NUMBER} "
-                }
-            }
-        }
-
-        stage('do some kubectl work') {
-            container('kubectl') {
-
-                withCredentials([[$class: 'UsernamePasswordMultiBinding', 
-                        credentialsId: 'dockerhub',
-                        usernameVariable: 'DOCKER_HUB_USER',
-                        passwordVariable: 'DOCKER_HUB_PASSWORD']]) {
-                    
-                    sh "kubectl get nodes"
-                }
-            }
-        }
+podTemplate(
+  label: label,
+  namespace: "go-demo-3-build",
+  serviceAccount: "build",
+  yaml: """
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: kubectl
+    image: vfarcic/kubectl
+    command: ["cat"]
+    tty: true
+  - name: golang
+    image: golang:1.9
+    command: ["cat"]
+    tty: true
+"""
+) {
+  node(label) {
+    node("docker") {
+      stage("build") {
+        git "${env.REPO}"
+        k8sBuildImageBeta(env.IMAGE)
+      }
     }
+    stage("func-test") {
+      try {
+        container("helm") {
+          git "${env.REPO}"
+          k8sUpgradeBeta(env.PROJECT, env.DOMAIN)
+        }
+        container("kubectl") {
+          k8sRolloutBeta(env.PROJECT)
+        }
+        container("golang") {
+          k8sFuncTestGolang(env.PROJECT, env.DOMAIN)
+        }
+      } catch(e) {
+          error "Failed functional tests"
+      } finally {
+        container("helm") {
+          k8sDeleteBeta(env.PROJECT)
+        }
+      }
+    }
+    stage("release") {
+      node("docker") {
+        k8sPushImage(env.IMAGE)
+      }
+      container("helm") {
+        k8sPushHelm(env.PROJECT, env.CHART_VER, env.CM_ADDR)
+      }
+    }
+  }
 }
