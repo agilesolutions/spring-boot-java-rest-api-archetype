@@ -39,6 +39,7 @@ Generates basic SpringBoot REST API application with the following features:
 
 ## Jenkins CI/CD integration
 * [read devops tools 2.4](https://github.com/vfarcic/vfarcic.github.io/blob/master/devops24/jenkins-cdp-demo.md)
+* [follow the devops tools md pages](https://github.com/vfarcic/vfarcic.github.io/tree/master/devops24)
 * kubeaps search stable/jenkins
 * download https://github.com/helm/charts/tree/master/stable/jenkins
 * helm install stable/jenkins -name jenkins --namespace jenkins
