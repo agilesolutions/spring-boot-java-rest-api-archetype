@@ -1,53 +1,31 @@
-import java.text.SimpleDateFormat
-
-currentBuild.displayName = new SimpleDateFormat("yy.MM.dd").format(new Date()) + "-" + env.BUILD_NUMBER
-env.PROJECT = "go-demo-3"
-env.REPO = "https://github.com/vfarcic/go-demo-3.git" // Change me!
-env.IMAGE = "vfarcic/go-demo-3" // Change me!
-env.DOMAIN = "acme.com" // Change me!
-env.ADDRESS = "go-demo-3.acme.com" // Change me!
-env.CM_ADDR = "cm.acme.com" // Change me!
-env.CHART_VER = "0.0.1"
-def label = "jenkins-slave-${UUID.randomUUID().toString()}"
-
-podTemplate(
-  label: label,
-  namespace: "go-demo-3-build",
-  serviceAccount: "build",
-  yaml: """
-apiVersion: v1
-kind: Pod
-spec:
-  containers:
-  - name: helm
-    image: vfarcic/helm:2.9.1
-    command: ["cat"]
-    tty: true
-"""
-) {
-  node(label) {
-    node("docker") {
-      stage("build") {
-        git "${env.REPO}"
-        k8sBuildImageBeta(env.IMAGE)
-      }
+def label = "${env.JOB_NAME}-${env.BUILD_ID}"
+def version = readMavenPom().getVersion().replaceAll("SNAPSHOT","").replaceAll("-","")
+def artifact = readMavenPom().getArtifactId()
+def museumaddress = "chartmeseum.juliusbaer.com"
+ 
+podTemplate(label: label, containers: [
+    containerTemplate(name: 'docker', image: 'docker', ttyEnabled: true, command: 'cat'),
+    containerTemplate(name: 'helm', image: 'vfarcic/helm:2.9.1', command: 'cat', ttyEnabled: true)
+  ],
+  volumes: [
+    hostPathVolume(mountPath: '/var/run/docker.sock', hostPath: '/var/run/docker.sock'),
+  ]) {
+    node(label) {
+ 
+        stage('deploy') {
+             try {
+                    container("helm") {
+                           k8sUpgrade(artifact, museumaddress)
+                    }
+                    container("kubectl") {
+                           k8sRollout(artifact)
+                    }
+             } catch(e) {
+                    container("helm") {
+                           k8sRollback(artifact)
+                    }
+             }
+       }
+ 
     }
-    stage("deploy") {
-      try {
-        container("helm") {
-          k8sUpgrade(env.PROJECT, env.ADDRESS)
-        }
-        container("kubectl") {
-          k8sRollout(env.PROJECT)
-        }
-        container("golang") {
-          k8sProdTestGolang(env.ADDRESS)
-        }
-      } catch(e) {
-        container("helm") {
-          k8sRollback(env.PROJECT)
-        }
-      }
-    }
-  }
 }
